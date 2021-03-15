@@ -15,7 +15,11 @@ class SiamUnet_conc(nn.Module):
 
         self.input_nbr = input_nbr
 
-        self.conv11 = nn.Conv2d(input_nbr, 16, kernel_size=3, padding=1)
+        #For heterogeneous images 
+        self.conv11_x1 = nn.Conv2d(input_nbr[0], 16, kernel_size=3, padding=1)
+        self.conv11_x2 = nn.Conv2d(input_nbr[1], 16, kernel_size=3, padding=1)
+        
+
         self.bn11 = nn.BatchNorm2d(16)
         self.do11 = nn.Dropout2d(p=0.2)
         self.conv12 = nn.Conv2d(16, 16, kernel_size=3, padding=1)
@@ -95,7 +99,7 @@ class SiamUnet_conc(nn.Module):
 
         """Forward method."""
         # Stage 1
-        x11 = self.do11(F.relu(self.bn11(self.conv11(x1))))
+        x11 = self.do11(F.relu(self.bn11(self.conv11_x1(x1))))
         x12_1 = self.do12(F.relu(self.bn12(self.conv12(x11))))
         x1p = F.max_pool2d(x12_1, kernel_size=2, stride=2)
 
@@ -120,7 +124,7 @@ class SiamUnet_conc(nn.Module):
 
         ####################################################
         # Stage 1
-        x11 = self.do11(F.relu(self.bn11(self.conv11(x2))))
+        x11 = self.do11(F.relu(self.bn11(self.conv11_x2(x2))))
         x12_2 = self.do12(F.relu(self.bn12(self.conv12(x11))))
         x1p = F.max_pool2d(x12_2, kernel_size=2, stride=2)
 
