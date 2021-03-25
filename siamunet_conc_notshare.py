@@ -11,7 +11,7 @@ class SiamUnet_conc_notshare(nn.Module):
     """SiamUnet_conc segmentation network."""
 
     def __init__(self, input_nbr, label_nbr):
-        super(SiamUnet_conc, self).__init__()
+        super(SiamUnet_conc_notshare, self).__init__()
 
         self.input_nbr = input_nbr
 
@@ -153,8 +153,8 @@ class SiamUnet_conc_notshare(nn.Module):
 
         # Stage 4
         x41 = self.do41_x1(F.relu(self.bn41_x1(self.conv41_x1(x3p))))
-        x42 = self.do42_x1(F.relu(self.bn42(self.conv42(x41))))
-        x43_1 = self.do43(F.relu(self.bn43(self.conv43(x42))))
+        x42 = self.do42_x1(F.relu(self.bn42_x1(self.conv42(x41))))
+        x43_1 = self.do43_x1(F.relu(self.bn43_x1(self.conv43(x42))))
         x4p = F.max_pool2d(x43_1, kernel_size=2, stride=2)
 
 
