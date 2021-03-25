@@ -16,59 +16,67 @@ warnings.filterwarnings("ignore")
 
 class CaliforniaDataset(torch.utils.data.Dataset):
     """Some Information about CaliforniaDataset"""
-    def __init__(self, img_size, data_size, mat_file):
+    def __init__(self, img_size, data_size, mat_file, transform = None):
         super(CaliforniaDataset, self).__init__()
 
-        self.dataset_dict = loadmat(mat_file)
-        x = self.dataset_dict["t1_L8_clipped"]
-        y = self.dataset_dict["logt2_clipped"]
-        c_x = x.shape[-1]
-        c_y = y.shape[-1]
-        x_chs = slice(0, c_x, 1)
-        y_chs = slice(c_x, c_x + c_y, 1)
-        print(x.shape)
-        print(y.shape)
-        print(type(x))
-        w, h = x.shape[0:2]
-        input = np.append(x, y, axis= -1)
-        gt = self.dataset_dict["ROI"]
-        gt = np.expand_dims(gt, axis = -1)
+        dataset_dict = loadmat(mat_file)
+        self.imgs_1 = dataset_dict["t1_L8_clipped"]
+        self.imgs_2 = dataset_dict["logt2_clipped"]
+        self.gt = dataset_dict["ROI"]
+        self.imgs_1 = self.swapaxes_(self.imgs_1)
+        self.imgs_2 = self.swapaxes_(self.imgs_2)
+        self.gt = torch.from_numpy(self.gt)
 
-        self.transforms = transforms.Compose([
-            #transforms.ToPILImage(),
-            #ImgAugTransform
-        ])
+        self.transform = transform
 
-        self.dataset_x = []
-        self.dataset_y = []
-        self.labels = []
-        for i in range(data_size//10):
-            data = input
-            for j in range(10):
-                random_x = np.random.randint(low = 0, high = w - img_size - 1)
-                random_y = np.random.randint(low = 0, high = h - img_size - 1)
-                img = data[random_x : random_x + img_size, random_y : random_y + img_size, :]
-                label = gt[random_x : random_x + img_size, random_y : random_y + img_size, :]
-                self.dataset_x.append(img[:, :, x_chs])
-                self.dataset_y.append(img[:, :, y_chs])
-                self.labels.append(label)
-        self.dataset_x = self.swapaxes_(torch.tensor(self.dataset_x))
-        self.dataset_y = self.swapaxes_(torch.tensor(self.dataset_y))
-        self.labels = torch.tensor(self.labels)
-        print("x shape: ", self.dataset_x.shape)
-        print("y_shape: ", self.dataset_y.shape)
-        print("gt_shape: ", self.labels.shape)
+        #self.imgs_1 shape: 
+
+        #print(x.shape)
+        #print(y.shape)
+        #print(type(x))
+
+
+        w, h = self.imgs_1.shape[1:]
+        self.img_size = img_size
+
+        n_pix = img_size[0]*img_size[1]*data_size
+        true_pix = 0
+
+        self.coords = []
+        for _ in range(data_size):
+            random_x = np.random.randint(low = 0, high = w - img_size[0] - 1)
+            random_y = np.random.randint(low = 0, high = h - img_size[1] - 1)
+            true_pix += np.sum(self.gt[random_x:random_x + img_size[0], random_y:random_y + img_size[1]].numpy())
+            self.coords.append([random_x, random_y])
+
+        print("imgs_1 shape: ", self.imgs_1.shape)
+        print("imgs_2 shape: ", self.imgs_2.shape)
+        print("gt shape: ", self.gt.shape)
+        print("true_pix: ", true_pix, "npix: ", n_pix)
+        print(self.coords)
+        self.weights = [ 10 * 2 * true_pix / n_pix, 2 * (n_pix - true_pix) / n_pix]
         #shape
 
 
     def __getitem__(self, index):
-        return ((self.dataset_x[index, :, :, :], self.dataset_y[index, :, :, :]), self.labels[index, : ,:, :])
+        coord = self.coords[index]
+        sample = {
+            'label': self.gt[coord[0]:coord[0] + self.img_size[0], coord[1]:coord[1] + self.img_size[1]],
+            'I1': self.imgs_1[:, coord[0]:coord[0] + self.img_size[0], coord[1]:coord[1] + self.img_size[1]],
+            'I2': self.imgs_2[:, coord[0]:coord[0] + self.img_size[0], coord[1]:coord[1] + self.img_size[1]]
+            
+        }
+        
+        if self.transform is not None:
+            sample = self.transform(sample)
+        #print('index = ', index)
+        #print('I1 shape' , sample['I1'].shape)
+        #print('I2 shape' ,sample['I2'].shape)
+        #print('label shape' ,sample['label'].shape)
+        return sample
 
     def __len__(self):
-        return len(self.dataset_x)
+        return len(self.coords)
 
-    def swapaxes_(self, dataset):
-        dataset = torch.swapaxes(dataset, 1, -1)
-        dataset = torch.swapaxes(dataset, -2, -1)
-        return dataset
-   
+    def swapaxes_(self, I):
+        return torch.from_numpy(I.transpose(2, 0, 1))
